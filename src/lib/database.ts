@@ -50,7 +50,10 @@ export async function fetchWeddings(): Promise<Wedding[]> {
     .select('*')
     .order('date', { ascending: true });
 
-  if (error || !weddings) return [];
+  if (error || !weddings) {
+    console.error('Failed to fetch weddings:', error);
+    return [];
+  }
 
   // Fetch flights for all weddings
   const weddingIds = weddings.map(w => w.id);
@@ -113,7 +116,10 @@ export async function createWedding(data: {
     .select()
     .single();
 
-  if (error || !wedding) return null;
+  if (error || !wedding) {
+    console.error('Failed to create wedding:', error);
+    return null;
+  }
 
   // Create flight if provided
   let flightRow = null;

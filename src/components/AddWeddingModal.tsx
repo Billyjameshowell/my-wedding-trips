@@ -17,7 +17,7 @@ interface AddWeddingModalProps {
       departureDate: string;
       returnDate: string;
     };
-  }) => void;
+  }) => void | Promise<void>;
 }
 
 export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingModalProps) {
@@ -31,31 +31,37 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
 
-  function handleSubmit(e: React.FormEvent) {
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!coupleName || !date || !location) return;
+    if (!coupleName || !date || !location || submitting) return;
 
-    onAdd({
-      coupleName,
-      date,
-      location,
-      venue: venue || undefined,
-      flight: showFlight && origin && destination && departureDate && returnDate
-        ? { origin: origin.toUpperCase(), destination: destination.toUpperCase(), departureDate, returnDate }
-        : undefined,
-    });
+    setSubmitting(true);
+    try {
+      await onAdd({
+        coupleName,
+        date,
+        location,
+        venue: venue || undefined,
+        flight: showFlight && origin && destination && departureDate && returnDate
+          ? { origin: origin.toUpperCase(), destination: destination.toUpperCase(), departureDate, returnDate }
+          : undefined,
+      });
 
-    // Reset
-    setCoupleName('');
-    setDate('');
-    setLocation('');
-    setVenue('');
-    setShowFlight(false);
-    setOrigin('');
-    setDestination('');
-    setDepartureDate('');
-    setReturnDate('');
-    onClose();
+      // Reset only after successful add
+      setCoupleName('');
+      setDate('');
+      setLocation('');
+      setVenue('');
+      setShowFlight(false);
+      setOrigin('');
+      setDestination('');
+      setDepartureDate('');
+      setReturnDate('');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (!isOpen) return null;
@@ -224,10 +230,12 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
               </button>
               <button
                 type="submit"
+                disabled={submitting}
                 className="flex-1 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold
-                  text-white hover:bg-gray-800 active:scale-[0.98] transition-all"
+                  text-white hover:bg-gray-800 active:scale-[0.98] transition-all
+                  disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add Wedding 🎉
+                {submitting ? 'Adding...' : 'Add Wedding 🎉'}
               </button>
             </div>
           </form>

@@ -47,19 +47,19 @@ export default function WeddingDetailPage() {
     if (!wedding?.flight) return;
     setPriceLoading(true);
     try {
-      const params = new URLSearchParams({
+      const searchParams = new URLSearchParams({
         origin: wedding.flight.origin,
         destination: wedding.flight.destination,
         departureDate: wedding.flight.departureDate,
         returnDate: wedding.flight.returnDate,
       });
-      const res = await fetch(`/api/flights?${params}`);
-      const data = await res.json();
-      if (data.lowestPrice) {
-        setLatestPrice(data.lowestPrice);
+      const res = await fetch(`/api/flights?${searchParams}`);
+      const result = await res.json();
+      if (result.lowestPrice) {
+        setLatestPrice(result.lowestPrice);
       }
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error('Price check failed:', err);
     }
     setPriceLoading(false);
   }

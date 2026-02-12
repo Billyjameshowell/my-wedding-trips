@@ -111,8 +111,8 @@ export default function Dashboard() {
       <AddWeddingModal
         isOpen={showAdd}
         onClose={() => setShowAdd(false)}
-        onAdd={(data) => {
-          addWedding(data);
+        onAdd={async (data) => {
+          await addWedding(data);
           setShowAdd(false);
         }}
       />
