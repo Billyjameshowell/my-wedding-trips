@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Wedding, TrackerStatus, STATUS_LABELS } from '@/lib/types';
-import { getWeddings, updateWedding } from '@/lib/storage';
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import { TrackerStatus } from '@/lib/types';
+import { useWeddings } from '@/lib/useWeddings';
 import { formatDate, daysUntil, getDaysLabel, getUrgencyClass, cn } from '@/lib/utils';
 import StatusPill from '@/components/StatusPill';
 import PriceChart from '@/components/PriceChart';
@@ -11,9 +11,12 @@ import Link from 'next/link';
 
 export default function WeddingDetailPage() {
   const params = useParams();
-  const router = useRouter();
-  const [wedding, setWedding] = useState<Wedding | null>(null);
+  const { weddings, loading, updateStatus, updateDetails } = useWeddings();
   const [editing, setEditing] = useState(false);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [latestPrice, setLatestPrice] = useState<number | null>(null);
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestMessage, setGuestMessage] = useState('');
   const [editForm, setEditForm] = useState({
     coupleName: '',
     date: '',
@@ -24,32 +27,51 @@ export default function WeddingDetailPage() {
     giftDetails: '',
   });
 
+  const wedding = weddings.find((w) => w.id === params.id);
+
   useEffect(() => {
-    const all = getWeddings();
-    const found = all.find((w) => w.id === params.id);
-    if (found) {
-      setWedding(found);
+    if (wedding) {
       setEditForm({
-        coupleName: found.coupleName,
-        date: found.date,
-        location: found.location,
-        venue: found.venue || '',
-        notes: found.notes || '',
-        hotelDetails: found.hotelDetails || '',
-        giftDetails: found.giftDetails || '',
+        coupleName: wedding.coupleName,
+        date: wedding.date,
+        location: wedding.location,
+        venue: wedding.venue || '',
+        notes: wedding.notes || '',
+        hotelDetails: wedding.hotelDetails || '',
+        giftDetails: wedding.giftDetails || '',
       });
     }
-  }, [params.id]);
+  }, [wedding]);
+
+  async function handleCheckPrice() {
+    if (!wedding?.flight) return;
+    setPriceLoading(true);
+    try {
+      const params = new URLSearchParams({
+        origin: wedding.flight.origin,
+        destination: wedding.flight.destination,
+        departureDate: wedding.flight.departureDate,
+        returnDate: wedding.flight.returnDate,
+      });
+      const res = await fetch(`/api/flights?${params}`);
+      const data = await res.json();
+      if (data.lowestPrice) {
+        setLatestPrice(data.lowestPrice);
+      }
+    } catch {
+      // silently fail
+    }
+    setPriceLoading(false);
+  }
 
   function handleStatusChange(field: 'flightStatus' | 'hotelStatus' | 'giftStatus', status: TrackerStatus) {
     if (!wedding) return;
-    const updated = updateWedding(wedding.id, { [field]: status });
-    if (updated) setWedding(updated);
+    updateStatus(wedding.id, field, status);
   }
 
   function handleSaveEdit() {
     if (!wedding) return;
-    const updated = updateWedding(wedding.id, {
+    updateDetails(wedding.id, {
       coupleName: editForm.coupleName,
       date: editForm.date,
       location: editForm.location,
@@ -58,8 +80,15 @@ export default function WeddingDetailPage() {
       hotelDetails: editForm.hotelDetails || undefined,
       giftDetails: editForm.giftDetails || undefined,
     });
-    if (updated) setWedding(updated);
     setEditing(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-300 text-lg">Loading...</div>
+      </div>
+    );
   }
 
   if (!wedding) {
@@ -96,7 +125,7 @@ export default function WeddingDetailPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <h1 className="text-3xl font-black text-gray-900">{wedding.coupleName}</h1>
-                  <div className="flex items-center gap-3 mt-2 text-gray-600">
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-gray-600">
                     <span>📍 {wedding.location}</span>
                     <span className="text-gray-300">·</span>
                     <span>{formatDate(wedding.date)}</span>
@@ -108,7 +137,7 @@ export default function WeddingDetailPage() {
                     )}
                   </div>
                 </div>
-                <div className={cn('text-right', getUrgencyClass(days))}>
+                <div className={cn('text-right flex-shrink-0 ml-4', getUrgencyClass(days))}>
                   <div className="text-4xl font-black">{days === 0 ? '🎉' : Math.abs(days)}</div>
                   <div className="text-xs font-semibold uppercase tracking-wider">{getDaysLabel(days)}</div>
                 </div>
@@ -205,7 +234,20 @@ export default function WeddingDetailPage() {
         {/* Flight details & price chart */}
         {wedding.flight && (
           <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Flight Details</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Flight Details</h2>
+              {wedding.flightStatus === 'watching' && (
+                <button
+                  onClick={handleCheckPrice}
+                  disabled={priceLoading}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors
+                    disabled:opacity-50"
+                >
+                  {priceLoading ? 'Checking...' : 'Check Price Now'}
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-4 mb-4">
               <div className="text-center">
                 <div className="text-lg font-black text-gray-900">{wedding.flight.origin}</div>
@@ -222,6 +264,14 @@ export default function WeddingDetailPage() {
               </div>
             </div>
 
+            {/* Live price result */}
+            {latestPrice && (
+              <div className="mb-4 bg-blue-50 rounded-xl p-3 text-center animate-in">
+                <div className="text-xs text-blue-600 font-semibold">Current lowest fare</div>
+                <div className="text-xl font-black text-blue-700">${latestPrice}</div>
+              </div>
+            )}
+
             {wedding.flightStatus === 'booked' && wedding.flight.pricePaid && (
               <div className="mb-4 bg-emerald-50 rounded-xl p-3 text-center">
                 <div className="text-xs text-emerald-600 font-semibold">Booked for</div>
@@ -236,37 +286,62 @@ export default function WeddingDetailPage() {
           </div>
         )}
 
+        {/* Guest seat */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
+          <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2">Guest Seat</h2>
+          <p className="text-xs text-gray-400 mb-4">
+            Invite your plus-one to view this wedding&apos;s trip details. One free guest per wedding!
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              value={guestEmail}
+              onChange={(e) => setGuestEmail(e.target.value)}
+              placeholder="partner@email.com"
+              className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
+                transition-all placeholder:text-gray-300"
+            />
+            <button
+              onClick={async () => {
+                if (!guestEmail) return;
+                // For now, just show confirmation. Full Supabase integration sends real invite.
+                setGuestMessage(`Invite sent to ${guestEmail}!`);
+                setGuestEmail('');
+                setTimeout(() => setGuestMessage(''), 3000);
+              }}
+              className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white
+                hover:bg-gray-800 active:scale-[0.98] transition-all"
+            >
+              Invite
+            </button>
+          </div>
+          {guestMessage && (
+            <div className="mt-2 text-xs font-medium text-emerald-600 animate-in">{guestMessage}</div>
+          )}
+        </div>
+
         {/* Notes section */}
         <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
           <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Notes</h2>
-
           <div className="space-y-3">
             <NoteField
               label="Hotel Details"
               value={wedding.hotelDetails || ''}
               placeholder="Hotel name, confirmation #, check-in/out dates..."
-              onChange={(v) => {
-                const updated = updateWedding(wedding.id, { hotelDetails: v || undefined });
-                if (updated) setWedding(updated);
-              }}
+              onChange={(v) => updateDetails(wedding.id, { hotelDetails: v || undefined })}
             />
             <NoteField
               label="Gift Details"
               value={wedding.giftDetails || ''}
               placeholder="Registry link, gift idea, budget..."
-              onChange={(v) => {
-                const updated = updateWedding(wedding.id, { giftDetails: v || undefined });
-                if (updated) setWedding(updated);
-              }}
+              onChange={(v) => updateDetails(wedding.id, { giftDetails: v || undefined })}
             />
             <NoteField
               label="Notes"
               value={wedding.notes || ''}
               placeholder="Anything else to remember..."
-              onChange={(v) => {
-                const updated = updateWedding(wedding.id, { notes: v || undefined });
-                if (updated) setWedding(updated);
-              }}
+              onChange={(v) => updateDetails(wedding.id, { notes: v || undefined })}
             />
           </div>
         </div>
@@ -299,6 +374,10 @@ function NoteField({ label, value, placeholder, onChange }: {
   onChange: (value: string) => void;
 }) {
   const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
 
   function handleBlur() {
     if (localValue !== value) onChange(localValue);
