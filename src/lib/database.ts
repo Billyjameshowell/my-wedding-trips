@@ -89,8 +89,11 @@ export async function createWedding(data: {
   flight?: { origin: string; destination: string; departureDate: string; returnDate: string };
 }): Promise<Wedding | null> {
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    console.error('Auth error in createWedding:', authError);
+    throw new Error(`Not authenticated: ${authError?.message || 'no user'}`);
+  }
 
   // Pick color
   const { data: existing } = await supabase
@@ -118,7 +121,7 @@ export async function createWedding(data: {
 
   if (error || !wedding) {
     console.error('Failed to create wedding:', error);
-    return null;
+    throw new Error(`DB insert failed: ${error?.message || 'unknown error'} (code: ${error?.code}, details: ${error?.details})`);
   }
 
   // Create flight if provided

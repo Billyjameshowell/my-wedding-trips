@@ -15,10 +15,12 @@ export default function Dashboard() {
     user,
     loading,
     hasSupabase,
+    error,
     addWedding,
     updateStatus,
     removeWedding,
     signOut,
+    clearError,
   } = useWeddings();
   const [showAdd, setShowAdd] = useState(false);
 
@@ -84,6 +86,24 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+
+      {/* Error banner */}
+      {error && (
+        <div className="max-w-5xl mx-auto px-4 pt-4">
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-red-700">Something went wrong</div>
+              <div className="text-xs text-red-600 mt-0.5 break-all">{error}</div>
+            </div>
+            <button
+              onClick={clearError}
+              className="text-red-400 hover:text-red-600 text-sm flex-shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <main className="max-w-5xl mx-auto px-4 py-6">

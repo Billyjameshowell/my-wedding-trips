@@ -12,15 +12,21 @@ export function useWeddings() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const hasSupabase = isSupabaseConfigured();
 
   const loadWeddings = useCallback(async () => {
-    if (isOnline) {
-      const data = await database.fetchWeddings();
-      setWeddings(sortWeddings(data));
-    } else {
-      setWeddings(sortWeddings(localStorage.getWeddings()));
+    try {
+      if (isOnline) {
+        const data = await database.fetchWeddings();
+        setWeddings(sortWeddings(data));
+      } else {
+        setWeddings(sortWeddings(localStorage.getWeddings()));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Load failed: ${msg}`);
     }
   }, [isOnline]);
 
@@ -62,27 +68,37 @@ export function useWeddings() {
     venue?: string;
     flight?: { origin: string; destination: string; departureDate: string; returnDate: string };
   }) => {
-    if (isOnline) {
-      await database.createWedding(data);
-    } else {
-      localStorage.addWedding({
-        coupleName: data.coupleName,
-        date: data.date,
-        location: data.location,
-        venue: data.venue,
-        flightStatus: data.flight ? 'watching' : 'not_started',
-        hotelStatus: 'not_started',
-        giftStatus: 'not_started',
-        flight: data.flight ? {
-          origin: data.flight.origin.toUpperCase(),
-          destination: data.flight.destination.toUpperCase(),
-          departureDate: data.flight.departureDate,
-          returnDate: data.flight.returnDate,
-          priceHistory: [],
-        } : undefined,
-      });
+    setError(null);
+    try {
+      if (isOnline) {
+        const result = await database.createWedding(data);
+        if (!result) {
+          setError('Failed to save wedding. Check browser console for details.');
+          return;
+        }
+      } else {
+        localStorage.addWedding({
+          coupleName: data.coupleName,
+          date: data.date,
+          location: data.location,
+          venue: data.venue,
+          flightStatus: data.flight ? 'watching' : 'not_started',
+          hotelStatus: 'not_started',
+          giftStatus: 'not_started',
+          flight: data.flight ? {
+            origin: data.flight.origin.toUpperCase(),
+            destination: data.flight.destination.toUpperCase(),
+            departureDate: data.flight.departureDate,
+            returnDate: data.flight.returnDate,
+            priceHistory: [],
+          } : undefined,
+        });
+      }
+      await loadWeddings();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Add failed: ${msg}`);
     }
-    await loadWeddings();
   }, [isOnline, loadWeddings]);
 
   const updateStatus = useCallback(async (
@@ -127,17 +143,21 @@ export function useWeddings() {
     }
   }, [hasSupabase]);
 
+  const clearError = useCallback(() => setError(null), []);
+
   return {
     weddings,
     user,
     loading,
     isOnline,
     hasSupabase,
+    error,
     addWedding,
     updateStatus,
     updateDetails,
     removeWedding,
     signOut,
+    clearError,
     refresh: loadWeddings,
   };
 }
