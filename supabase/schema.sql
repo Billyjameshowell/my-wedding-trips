@@ -69,19 +69,28 @@ alter table public.flights enable row level security;
 alter table public.price_history enable row level security;
 alter table public.guest_seats enable row level security;
 
+-- Helper functions (SECURITY DEFINER = bypass RLS, breaks circular policy refs)
+create or replace function public.own_wedding_ids()
+returns setof uuid as $$
+  select id from public.weddings where user_id = auth.uid()
+$$ language sql security definer stable;
+
+create or replace function public.guest_wedding_ids()
+returns setof uuid as $$
+  select wedding_id from public.guest_seats where guest_user_id = auth.uid()
+$$ language sql security definer stable;
+
 -- Profiles: users can read/update their own profile
 create policy "Users can view own profile" on public.profiles
   for select using (auth.uid() = id);
 create policy "Users can update own profile" on public.profiles
   for update using (auth.uid() = id);
 
--- Weddings: separate policies to avoid circular references with guest_seats
+-- Weddings: use helper functions to avoid circular RLS
 create policy "Users can view own weddings" on public.weddings
   for select using (user_id = auth.uid());
 create policy "Guests can view shared weddings" on public.weddings
-  for select using (
-    id in (select wedding_id from public.guest_seats where guest_user_id = auth.uid())
-  );
+  for select using (id in (select public.guest_wedding_ids()));
 create policy "Users can insert own weddings" on public.weddings
   for insert with check (user_id = auth.uid());
 create policy "Users can update own weddings" on public.weddings
@@ -89,39 +98,32 @@ create policy "Users can update own weddings" on public.weddings
 create policy "Users can delete own weddings" on public.weddings
   for delete using (user_id = auth.uid());
 
--- Flights: separate policies for owners and guests
+-- Flights: use helper functions
 create policy "Users can view flights for their weddings" on public.flights
-  for select using (
-    wedding_id in (select id from public.weddings where user_id = auth.uid())
-  );
+  for select using (wedding_id in (select public.own_wedding_ids()));
 create policy "Guests can view shared flights" on public.flights
-  for select using (
-    wedding_id in (select wedding_id from public.guest_seats where guest_user_id = auth.uid())
-  );
+  for select using (wedding_id in (select public.guest_wedding_ids()));
 create policy "Users can manage flights for own weddings" on public.flights
-  for insert with check (wedding_id in (select id from public.weddings where user_id = auth.uid()));
+  for insert with check (wedding_id in (select public.own_wedding_ids()));
 create policy "Users can update flights for own weddings" on public.flights
-  for update using (wedding_id in (select id from public.weddings where user_id = auth.uid()));
+  for update using (wedding_id in (select public.own_wedding_ids()));
 create policy "Users can delete flights for own weddings" on public.flights
-  for delete using (wedding_id in (select id from public.weddings where user_id = auth.uid()));
+  for delete using (wedding_id in (select public.own_wedding_ids()));
 
--- Price history: follow flight access
+-- Price history: use helper function
 create policy "Users can view price history" on public.price_history
   for select using (
     flight_id in (
       select f.id from public.flights f
-      join public.weddings w on f.wedding_id = w.id
-      where w.user_id = auth.uid()
+      where f.wedding_id in (select public.own_wedding_ids())
     )
   );
 create policy "Service can insert price history" on public.price_history
   for insert with check (true); -- API route handles auth
 
--- Guest seats: owner manages, guest can view their own seat
+-- Guest seats: use helper function for owner check
 create policy "Owner can manage guest seats" on public.guest_seats
-  for all using (
-    wedding_id in (select id from public.weddings where user_id = auth.uid())
-  );
+  for all using (wedding_id in (select public.own_wedding_ids()));
 create policy "Guest can view their seat" on public.guest_seats
   for select using (invited_email = auth.email());
 
