@@ -10,6 +10,14 @@ export interface FlightInfo {
   priceThreshold?: number; // notify below this
 }
 
+export interface AddWeddingInput {
+  coupleName: string;
+  date: string;
+  location: string;
+  venue?: string;
+  flight?: Pick<FlightInfo, 'origin' | 'destination' | 'departureDate' | 'returnDate'>;
+}
+
 export interface Wedding {
   id: string;
   coupleName: string; // e.g. "Sarah & Mike"

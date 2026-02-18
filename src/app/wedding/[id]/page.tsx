@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { TrackerStatus } from '@/lib/types';
 import { useWeddings } from '@/lib/useWeddings';
@@ -15,6 +15,7 @@ export default function WeddingDetailPage() {
   const [editing, setEditing] = useState(false);
   const [priceLoading, setPriceLoading] = useState(false);
   const [latestPrice, setLatestPrice] = useState<number | null>(null);
+  const [priceMessage, setPriceMessage] = useState<string | null>(null);
   const [guestEmail, setGuestEmail] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
   const [editForm, setEditForm] = useState({
@@ -46,6 +47,8 @@ export default function WeddingDetailPage() {
   async function handleCheckPrice() {
     if (!wedding?.flight) return;
     setPriceLoading(true);
+    setPriceMessage(null);
+
     try {
       const searchParams = new URLSearchParams({
         origin: wedding.flight.origin,
@@ -53,15 +56,35 @@ export default function WeddingDetailPage() {
         departureDate: wedding.flight.departureDate,
         returnDate: wedding.flight.returnDate,
       });
+
       const res = await fetch(`/api/flights?${searchParams}`);
       const result = await res.json();
-      if (result.lowestPrice) {
-        setLatestPrice(result.lowestPrice);
+
+      if (!res.ok) {
+        setLatestPrice(null);
+        setPriceMessage(result.error || 'Could not fetch live fares right now.');
+        return;
       }
+
+      if (typeof result.lowestPrice === 'number') {
+        setLatestPrice(result.lowestPrice);
+        setPriceMessage(
+          result.source === 'mock'
+            ? 'Showing mock prices. Add Amadeus API keys for live fares.'
+            : 'Live fare updated just now.'
+        );
+        return;
+      }
+
+      setLatestPrice(null);
+      setPriceMessage('No fares found for this route and date range.');
     } catch (err) {
       console.error('Price check failed:', err);
+      setLatestPrice(null);
+      setPriceMessage('Price check failed. Please try again in a moment.');
+    } finally {
+      setPriceLoading(false);
     }
-    setPriceLoading(false);
   }
 
   function handleStatusChange(field: 'flightStatus' | 'hotelStatus' | 'giftStatus', status: TrackerStatus) {
@@ -82,6 +105,16 @@ export default function WeddingDetailPage() {
     });
     setEditing(false);
   }
+
+  const displayedPriceHistory = useMemo(() => {
+    if (!wedding?.flight) return [];
+    if (latestPrice === null) return wedding.flight.priceHistory;
+
+    return [
+      ...wedding.flight.priceHistory,
+      { date: new Date().toISOString(), price: latestPrice },
+    ];
+  }, [latestPrice, wedding]);
 
   if (loading) {
     return (
@@ -236,8 +269,7 @@ export default function WeddingDetailPage() {
           <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Flight Details</h2>
-              {wedding.flightStatus === 'watching' && (
-                <button
+              <button
                   onClick={handleCheckPrice}
                   disabled={priceLoading}
                   className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors
@@ -245,7 +277,6 @@ export default function WeddingDetailPage() {
                 >
                   {priceLoading ? 'Checking...' : 'Check Price Now'}
                 </button>
-              )}
             </div>
 
             <div className="flex items-center gap-4 mb-4">
@@ -265,10 +296,17 @@ export default function WeddingDetailPage() {
             </div>
 
             {/* Live price result */}
-            {latestPrice && (
+            {latestPrice !== null && (
               <div className="mb-4 bg-blue-50 rounded-xl p-3 text-center animate-in">
                 <div className="text-xs text-blue-600 font-semibold">Current lowest fare</div>
                 <div className="text-xl font-black text-blue-700">${latestPrice}</div>
+              </div>
+            )}
+
+
+            {priceMessage && (
+              <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center text-xs font-medium text-gray-600">
+                {priceMessage}
               </div>
             )}
 
@@ -280,7 +318,7 @@ export default function WeddingDetailPage() {
             )}
 
             <PriceChart
-              history={wedding.flight.priceHistory}
+              history={displayedPriceHistory}
               threshold={wedding.flight.priceThreshold}
             />
           </div>

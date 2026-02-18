@@ -1,23 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { AddWeddingInput } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface AddWeddingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (data: {
-    coupleName: string;
-    date: string;
-    location: string;
-    venue?: string;
-    flight?: {
-      origin: string;
-      destination: string;
-      departureDate: string;
-      returnDate: string;
-    };
-  }) => void | Promise<void>;
+  onAdd: (data: AddWeddingInput) => void | Promise<void>;
 }
 
 export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingModalProps) {
@@ -32,24 +22,66 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
   const [returnDate, setReturnDate] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const departureDateRef = useRef<HTMLInputElement>(null);
+  const returnDateRef = useRef<HTMLInputElement>(null);
+
+  function getFlightValidationError() {
+    if (!showFlight) return null;
+
+    const trimmedOrigin = origin.trim().toUpperCase();
+    const trimmedDestination = destination.trim().toUpperCase();
+
+    if (!trimmedOrigin || !trimmedDestination || !departureDate || !returnDate) {
+      return 'Please complete all flight fields or remove flight details.';
+    }
+
+    const airportCode = /^[A-Z]{3}$/;
+    if (!airportCode.test(trimmedOrigin) || !airportCode.test(trimmedDestination)) {
+      return 'Airport codes must be exactly 3 letters (for example: LAX).';
+    }
+
+    if (returnDate < departureDate) {
+      return 'Return date must be on or after departure date.';
+    }
+
+    return null;
+  }
+
+  function openReturnPicker() {
+    returnDateRef.current?.focus();
+    if (typeof returnDateRef.current?.showPicker === 'function') {
+      returnDateRef.current.showPicker();
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!coupleName || !date || !location || submitting) return;
+    if (!coupleName.trim() || !date || !location.trim() || submitting) return;
+
+    const validationError = getFlightValidationError();
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError(null);
+    const trimmedOrigin = origin.trim().toUpperCase();
+    const trimmedDestination = destination.trim().toUpperCase();
 
     setSubmitting(true);
     try {
       await onAdd({
-        coupleName,
+        coupleName: coupleName.trim(),
         date,
-        location,
-        venue: venue || undefined,
-        flight: showFlight && origin && destination && departureDate && returnDate
-          ? { origin: origin.toUpperCase(), destination: destination.toUpperCase(), departureDate, returnDate }
+        location: location.trim(),
+        venue: venue.trim() || undefined,
+        flight: showFlight
+          ? { origin: trimmedOrigin, destination: trimmedDestination, departureDate, returnDate }
           : undefined,
       });
 
-      // Reset only after successful add
       setCoupleName('');
       setDate('');
       setLocation('');
@@ -59,6 +91,7 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
       setDestination('');
       setDepartureDate('');
       setReturnDate('');
+      setFormError(null);
     } finally {
       setSubmitting(false);
     }
@@ -68,27 +101,21 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Modal */}
-      <div className={cn(
-        'relative w-full max-w-lg bg-white rounded-2xl shadow-2xl',
-        'animate-in fade-in slide-in-from-bottom-4 duration-300'
-      )}>
+      <div
+        className={cn(
+          'relative w-full max-w-lg bg-white rounded-2xl shadow-2xl',
+          'animate-in fade-in slide-in-from-bottom-4 duration-300'
+        )}
+      >
         <div className="p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-1">Add a Wedding</h2>
           <p className="text-sm text-gray-500 mb-6">Another one! Let&apos;s get organized.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Couple name */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Who&apos;s getting married?
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Who&apos;s getting married?</label>
               <input
                 type="text"
                 value={coupleName}
@@ -102,12 +129,9 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
               />
             </div>
 
-            {/* Date & Location row */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Wedding Date
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Wedding Date</label>
                 <input
                   type="date"
                   value={date}
@@ -119,9 +143,7 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Location
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Location</label>
                 <input
                   type="text"
                   value={location}
@@ -135,7 +157,6 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
               </div>
             </div>
 
-            {/* Venue */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Venue <span className="font-normal text-gray-400">(optional)</span>
@@ -151,11 +172,13 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
               />
             </div>
 
-            {/* Flight toggle */}
             <div>
               <button
                 type="button"
-                onClick={() => setShowFlight(!showFlight)}
+                onClick={() => {
+                  setShowFlight(!showFlight);
+                  setFormError(null);
+                }}
                 className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
               >
                 <span className={cn('transition-transform', showFlight && 'rotate-90')}>▸</span>
@@ -170,7 +193,10 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                       <input
                         type="text"
                         value={origin}
-                        onChange={(e) => setOrigin(e.target.value)}
+                        onChange={(e) => {
+                          setOrigin(e.target.value.trim().toUpperCase());
+                          setFormError(null);
+                        }}
                         placeholder="LAX"
                         maxLength={3}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm uppercase
@@ -183,7 +209,10 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                       <input
                         type="text"
                         value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
+                        onChange={(e) => {
+                          setDestination(e.target.value.trim().toUpperCase());
+                          setFormError(null);
+                        }}
                         placeholder="AUS"
                         maxLength={3}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm uppercase
@@ -192,33 +221,53 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Depart</label>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Travel Dates</label>
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                       <input
+                        ref={departureDateRef}
                         type="date"
                         value={departureDate}
-                        onChange={(e) => setDepartureDate(e.target.value)}
+                        max={returnDate || undefined}
+                        onChange={(e) => {
+                          const nextDepartureDate = e.target.value;
+                          setDepartureDate(nextDepartureDate);
+                          if (returnDate && returnDate < nextDepartureDate) {
+                            setReturnDate(nextDepartureDate);
+                          }
+                          setFormError(null);
+                          openReturnPicker();
+                        }}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
                           focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Return</label>
+                      <span className="text-xs text-gray-400 font-semibold">→</span>
                       <input
+                        ref={returnDateRef}
                         type="date"
                         value={returnDate}
-                        onChange={(e) => setReturnDate(e.target.value)}
+                        min={departureDate || undefined}
+                        onChange={(e) => {
+                          setReturnDate(e.target.value);
+                          setFormError(null);
+                        }}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
                           focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                       />
                     </div>
+                    <p className="mt-1 text-[11px] text-gray-400">Pick departure first, then return opens right away.</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Actions */}
+            {formError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                {formError}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-2">
               <button
                 type="button"

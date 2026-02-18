@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Wedding, TrackerStatus } from './types';
+import { Wedding, TrackerStatus, AddWeddingInput } from './types';
 import { createClient, isSupabaseConfigured } from './supabase';
 import * as localStorage from './storage';
 import * as database from './database';
@@ -61,20 +61,14 @@ export function useWeddings() {
     loadWeddings();
   }, [isOnline, loadWeddings]);
 
-  const addWedding = useCallback(async (data: {
-    coupleName: string;
-    date: string;
-    location: string;
-    venue?: string;
-    flight?: { origin: string; destination: string; departureDate: string; returnDate: string };
-  }) => {
+  const addWedding = useCallback(async (data: AddWeddingInput): Promise<boolean> => {
     setError(null);
     try {
       if (isOnline) {
         const result = await database.createWedding(data);
         if (!result) {
           setError('Failed to save wedding. Check browser console for details.');
-          return;
+          return false;
         }
       } else {
         localStorage.addWedding({
@@ -95,9 +89,11 @@ export function useWeddings() {
         });
       }
       await loadWeddings();
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(`Add failed: ${msg}`);
+      return false;
     }
   }, [isOnline, loadWeddings]);
 
