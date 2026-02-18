@@ -1,23 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { AddWeddingInput } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface AddWeddingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (data: {
-    coupleName: string;
-    date: string;
-    location: string;
-    venue?: string;
-    flight?: {
-      origin: string;
-      destination: string;
-      departureDate: string;
-      returnDate: string;
-    };
-  }) => void | Promise<void>;
+  onAdd: (data: AddWeddingInput) => void | Promise<void>;
 }
 
 export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingModalProps) {
@@ -32,20 +22,53 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
   const [returnDate, setReturnDate] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  function getFlightValidationError() {
+    if (!showFlight) return null;
+
+    const trimmedOrigin = origin.trim().toUpperCase();
+    const trimmedDestination = destination.trim().toUpperCase();
+
+    if (!trimmedOrigin || !trimmedDestination || !departureDate || !returnDate) {
+      return 'Please complete all flight fields or remove flight details.';
+    }
+
+    const airportCode = /^[A-Z]{3}$/;
+    if (!airportCode.test(trimmedOrigin) || !airportCode.test(trimmedDestination)) {
+      return 'Airport codes must be exactly 3 letters (for example: LAX).';
+    }
+
+    if (returnDate < departureDate) {
+      return 'Return date must be on or after departure date.';
+    }
+
+    return null;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!coupleName || !date || !location || submitting) return;
 
+    const validationError = getFlightValidationError();
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError(null);
+    const trimmedOrigin = origin.trim().toUpperCase();
+    const trimmedDestination = destination.trim().toUpperCase();
+
     setSubmitting(true);
     try {
       await onAdd({
-        coupleName,
+        coupleName: coupleName.trim(),
         date,
-        location,
-        venue: venue || undefined,
-        flight: showFlight && origin && destination && departureDate && returnDate
-          ? { origin: origin.toUpperCase(), destination: destination.toUpperCase(), departureDate, returnDate }
+        location: location.trim(),
+        venue: venue.trim() || undefined,
+        flight: showFlight
+          ? { origin: trimmedOrigin, destination: trimmedDestination, departureDate, returnDate }
           : undefined,
       });
 
@@ -155,7 +178,10 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
             <div>
               <button
                 type="button"
-                onClick={() => setShowFlight(!showFlight)}
+                onClick={() => {
+                  setShowFlight(!showFlight);
+                  setFormError(null);
+                }}
                 className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
               >
                 <span className={cn('transition-transform', showFlight && 'rotate-90')}>▸</span>
@@ -170,7 +196,10 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                       <input
                         type="text"
                         value={origin}
-                        onChange={(e) => setOrigin(e.target.value)}
+                        onChange={(e) => {
+                          setOrigin(e.target.value.trim().toUpperCase());
+                          setFormError(null);
+                        }}
                         placeholder="LAX"
                         maxLength={3}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm uppercase
@@ -183,7 +212,10 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                       <input
                         type="text"
                         value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
+                        onChange={(e) => {
+                          setDestination(e.target.value.trim().toUpperCase());
+                          setFormError(null);
+                        }}
                         placeholder="AUS"
                         maxLength={3}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm uppercase
@@ -198,7 +230,10 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                       <input
                         type="date"
                         value={departureDate}
-                        onChange={(e) => setDepartureDate(e.target.value)}
+                        onChange={(e) => {
+                          setDepartureDate(e.target.value);
+                          setFormError(null);
+                        }}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
                           focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                       />
@@ -208,7 +243,10 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                       <input
                         type="date"
                         value={returnDate}
-                        onChange={(e) => setReturnDate(e.target.value)}
+                        onChange={(e) => {
+                          setReturnDate(e.target.value);
+                          setFormError(null);
+                        }}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
                           focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                       />
@@ -217,6 +255,13 @@ export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingMo
                 </div>
               )}
             </div>
+
+
+            {formError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                {formError}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
