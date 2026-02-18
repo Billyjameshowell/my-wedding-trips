@@ -58,7 +58,11 @@ export function useWeddings() {
   }, [hasSupabase]);
 
   useEffect(() => {
-    loadWeddings();
+    const loadTimer = window.setTimeout(() => {
+      void loadWeddings();
+    }, 0);
+
+    return () => window.clearTimeout(loadTimer);
   }, [isOnline, loadWeddings]);
 
   const addWedding = useCallback(async (data: AddWeddingInput): Promise<boolean> => {

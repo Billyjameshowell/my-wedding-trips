@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ export default function LoginPage() {
           <div className="text-4xl mb-3">🔧</div>
           <h2 className="text-lg font-bold text-gray-900 mb-2">Auth Not Configured</h2>
           <p className="text-sm text-gray-500 mb-4">Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to enable login.</p>
-          <a href="/" className="text-blue-600 hover:text-blue-700 font-semibold text-sm">← Back to Dashboard</a>
+          <Link href="/" className="text-blue-600 hover:text-blue-700 font-semibold text-sm">← Back to Dashboard</Link>
         </div>
       </div>
     );
