@@ -128,6 +128,20 @@ export function useWeddings() {
     await loadWeddings();
   }, [isOnline, loadWeddings]);
 
+  const savePriceCheck = useCallback(async (weddingId: string, price: number) => {
+    try {
+      if (isOnline) {
+        await database.addPriceToHistory(weddingId, price);
+      } else {
+        localStorage.addPriceToHistory(weddingId, price);
+      }
+      await loadWeddings();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Price save failed: ${msg}`);
+    }
+  }, [isOnline, loadWeddings]);
+
   const signOut = useCallback(async () => {
     if (hasSupabase) {
       const supabase = createClient();
@@ -152,6 +166,7 @@ export function useWeddings() {
     updateStatus,
     updateDetails,
     removeWedding,
+    savePriceCheck,
     signOut,
     clearError,
     refresh: loadWeddings,

@@ -60,3 +60,16 @@ export function deleteWedding(id: string): boolean {
   saveWeddings(filtered);
   return true;
 }
+
+export function addPriceToHistory(weddingId: string, price: number): boolean {
+  const weddings = getWeddings();
+  const wedding = weddings.find((w) => w.id === weddingId);
+  if (!wedding?.flight) return false;
+
+  wedding.flight.priceHistory.push({
+    date: new Date().toISOString(),
+    price,
+  });
+  saveWeddings(weddings);
+  return true;
+}

@@ -204,6 +204,36 @@ export async function deleteWeddingDB(id: string): Promise<boolean> {
   return !error;
 }
 
+export async function addPriceToHistory(weddingId: string, price: number): Promise<boolean> {
+  const supabase = getSupabase();
+
+  // Find the flight for this wedding
+  const { data: flight, error: flightError } = await supabase
+    .from('flights')
+    .select('id')
+    .eq('wedding_id', weddingId)
+    .single();
+
+  if (flightError || !flight) {
+    console.error('No flight found for wedding:', weddingId, flightError);
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('price_history')
+    .insert({
+      flight_id: flight.id,
+      price,
+    });
+
+  if (error) {
+    console.error('Failed to save price history:', error);
+    return false;
+  }
+
+  return true;
+}
+
 export async function inviteGuest(weddingId: string, email: string): Promise<boolean> {
   const supabase = getSupabase();
   const { error } = await supabase

@@ -11,10 +11,11 @@ import Link from 'next/link';
 
 export default function WeddingDetailPage() {
   const params = useParams();
-  const { weddings, loading, updateStatus, updateDetails } = useWeddings();
+  const { weddings, loading, updateStatus, updateDetails, savePriceCheck } = useWeddings();
   const [editing, setEditing] = useState(false);
   const [priceLoading, setPriceLoading] = useState(false);
   const [latestPrice, setLatestPrice] = useState<number | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
   const [guestEmail, setGuestEmail] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
   const [editForm, setEditForm] = useState({
@@ -46,6 +47,7 @@ export default function WeddingDetailPage() {
   async function handleCheckPrice() {
     if (!wedding?.flight) return;
     setPriceLoading(true);
+    setPriceError(null);
     try {
       const searchParams = new URLSearchParams({
         origin: wedding.flight.origin,
@@ -55,11 +57,18 @@ export default function WeddingDetailPage() {
       });
       const res = await fetch(`/api/flights?${searchParams}`);
       const result = await res.json();
-      if (result.lowestPrice) {
+      if (!res.ok) {
+        setPriceError(result.error || `Price check failed (${res.status})`);
+      } else if (result.lowestPrice) {
         setLatestPrice(result.lowestPrice);
+        // Persist to price history
+        await savePriceCheck(wedding.id, result.lowestPrice);
+      } else {
+        setPriceError('No flight prices found for these dates.');
       }
     } catch (err) {
-      console.error('Price check failed:', err);
+      const msg = err instanceof Error ? err.message : 'Network error';
+      setPriceError(`Price check failed: ${msg}`);
     }
     setPriceLoading(false);
   }
@@ -236,7 +245,7 @@ export default function WeddingDetailPage() {
           <div className="bg-white rounded-2xl p-5 shadow-sm ring-1 ring-gray-100">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Flight Details</h2>
-              {wedding.flightStatus === 'watching' && (
+              {wedding.flightStatus !== 'done' && (
                 <button
                   onClick={handleCheckPrice}
                   disabled={priceLoading}
@@ -269,6 +278,13 @@ export default function WeddingDetailPage() {
               <div className="mb-4 bg-blue-50 rounded-xl p-3 text-center animate-in">
                 <div className="text-xs text-blue-600 font-semibold">Current lowest fare</div>
                 <div className="text-xl font-black text-blue-700">${latestPrice}</div>
+              </div>
+            )}
+
+            {/* Price check error */}
+            {priceError && (
+              <div className="mb-4 bg-red-50 rounded-xl p-3 text-center animate-in">
+                <div className="text-xs text-red-600 font-semibold">{priceError}</div>
               </div>
             )}
 
