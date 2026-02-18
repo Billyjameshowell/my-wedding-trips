@@ -1,7 +1,7 @@
 'use client';
 
 import { createClient } from './supabase';
-import { Wedding, TrackerStatus, CARD_COLORS } from './types';
+import { Wedding, TrackerStatus, CARD_COLORS, AddWeddingInput } from './types';
 
 function getSupabase() {
   const client = createClient();
@@ -55,12 +55,20 @@ export async function fetchWeddings(): Promise<Wedding[]> {
     return [];
   }
 
+  if (weddings.length === 0) {
+    return [];
+  }
+
   // Fetch flights for all weddings
-  const weddingIds = weddings.map(w => w.id);
-  const { data: flights } = await supabase
+  const weddingIds = weddings.map((w) => w.id);
+  const { data: flights, error: flightsError } = await supabase
     .from('flights')
     .select('*')
     .in('wedding_id', weddingIds);
+
+  if (flightsError) {
+    console.error('Failed to fetch flights:', flightsError);
+  }
 
   // Fetch price history for all flights
   const flightIds = (flights || []).map(f => f.id);
@@ -81,13 +89,7 @@ export async function fetchWeddings(): Promise<Wedding[]> {
   });
 }
 
-export async function createWedding(data: {
-  coupleName: string;
-  date: string;
-  location: string;
-  venue?: string;
-  flight?: { origin: string; destination: string; departureDate: string; returnDate: string };
-}): Promise<Wedding | null> {
+export async function createWedding(data: AddWeddingInput): Promise<Wedding | null> {
   const supabase = getSupabase();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
@@ -127,7 +129,7 @@ export async function createWedding(data: {
   // Create flight if provided
   let flightRow = null;
   if (data.flight) {
-    const { data: f } = await supabase
+    const { data: f, error: flightError } = await supabase
       .from('flights')
       .insert({
         wedding_id: wedding.id,
@@ -138,6 +140,21 @@ export async function createWedding(data: {
       })
       .select()
       .single();
+
+    if (flightError || !f) {
+      console.error('Failed to create flight details:', flightError);
+      const { error: rollbackError } = await supabase
+        .from('weddings')
+        .delete()
+        .eq('id', wedding.id);
+
+      if (rollbackError) {
+        console.error('Rollback failed after flight creation error:', rollbackError);
+      }
+
+      throw new Error(`Flight insert failed: ${flightError?.message || 'unknown error'}`);
+    }
+
     flightRow = f;
   }
 

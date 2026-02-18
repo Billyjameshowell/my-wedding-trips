@@ -132,8 +132,10 @@ export default function Dashboard() {
         isOpen={showAdd}
         onClose={() => setShowAdd(false)}
         onAdd={async (data) => {
-          await addWedding(data);
-          setShowAdd(false);
+          const added = await addWedding(data);
+          if (added) {
+            setShowAdd(false);
+          }
         }}
       />
     </div>
