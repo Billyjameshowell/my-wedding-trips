@@ -7,6 +7,11 @@ const checks = {
   amadeus: ['AMADEUS_API_KEY', 'AMADEUS_API_SECRET'],
 };
 
+const supabaseAuthKeys = [
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+];
+
 const SUPABASE_HEALTH_TIMEOUT_MS = 5_000;
 
 async function isSupabaseReachable(): Promise<boolean> {
@@ -32,7 +37,12 @@ async function isSupabaseReachable(): Promise<boolean> {
 export async function GET() {
   const result: Record<
     string,
-    { configured: boolean; missing: string[]; reachable?: boolean | null }
+    {
+      configured: boolean;
+      missing: string[];
+      authConfigured?: boolean;
+      reachable?: boolean | null;
+    }
   > = Object.fromEntries(
     Object.entries(checks).map(([name, keys]) => [
       name,
@@ -43,7 +53,10 @@ export async function GET() {
     ])
   );
 
-  result.supabase.reachable = result.supabase.configured
+  result.supabase.authConfigured = supabaseAuthKeys.every(
+    (key) => !!process.env[key]
+  );
+  result.supabase.reachable = result.supabase.authConfigured
     ? await isSupabaseReachable()
     : null;
 

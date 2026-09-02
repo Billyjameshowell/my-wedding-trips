@@ -46,12 +46,19 @@ describe('readiness API', () => {
     const response = await GET();
     const body = responseBody<{
       ready: boolean;
-      checks: { supabase: { configured: boolean; reachable: boolean | null } };
+      checks: {
+        supabase: {
+          configured: boolean;
+          authConfigured: boolean;
+          reachable: boolean | null;
+        };
+      };
     }>(response);
 
     expect(response.status).toBe(503);
     expect(body.ready).toBe(false);
     expect(body.checks.supabase.configured).toBe(false);
+    expect(body.checks.supabase.authConfigured).toBe(false);
     expect(body.checks.supabase.reachable).toBeNull();
     expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
@@ -74,6 +81,35 @@ describe('readiness API', () => {
         headers: { apikey: 'next_public_supabase_publishable_key_value' },
       })
     );
+  });
+
+  it('checks Auth reachability even when server-only Supabase credentials are missing', async () => {
+    configureEnvironment();
+    vi.stubEnv('SUPABASE_SECRET_KEY', '');
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+    vi.stubGlobal('fetch', fetchMock);
+    const { GET } = await import('@/app/api/readiness/route');
+
+    const response = await GET();
+    const body = responseBody<{
+      ready: boolean;
+      checks: {
+        supabase: {
+          configured: boolean;
+          missing: string[];
+          authConfigured: boolean;
+          reachable: boolean | null;
+        };
+      };
+    }>(response);
+
+    expect(response.status).toBe(503);
+    expect(body.ready).toBe(false);
+    expect(body.checks.supabase.configured).toBe(false);
+    expect(body.checks.supabase.missing).toContain('SUPABASE_SECRET_KEY');
+    expect(body.checks.supabase.authConfigured).toBe(true);
+    expect(body.checks.supabase.reachable).toBe(false);
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -100,12 +136,19 @@ describe('readiness API', () => {
     const response = await GET();
     const body = responseBody<{
       ready: boolean;
-      checks: { supabase: { configured: boolean; reachable: boolean | null } };
+      checks: {
+        supabase: {
+          configured: boolean;
+          authConfigured: boolean;
+          reachable: boolean | null;
+        };
+      };
     }>(response);
 
     expect(response.status).toBe(503);
     expect(body.ready).toBe(false);
     expect(body.checks.supabase.configured).toBe(true);
+    expect(body.checks.supabase.authConfigured).toBe(true);
     expect(body.checks.supabase.reachable).toBe(false);
   });
 });
