@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { createClient, isSupabaseConfigured } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
+import { describeAuthError, getAuthCallbackErrorMessage } from '@/lib/auth-errors';
+import { createClient, getSupabaseConfigurationError } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -12,14 +14,23 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const router = useRouter();
-  if (!isSupabaseConfigured()) {
+  const configurationError = getSupabaseConfigurationError();
+
+  useEffect(() => {
+    const callbackError = getAuthCallbackErrorMessage(
+      new URLSearchParams(window.location.search).get('auth_error')
+    );
+    if (callbackError) setError(callbackError);
+  }, []);
+
+  if (configurationError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="text-center">
           <div className="text-4xl mb-3">🔧</div>
           <h2 className="text-lg font-bold text-gray-900 mb-2">Auth Not Configured</h2>
-          <p className="text-sm text-gray-500 mb-4">Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to enable login.</p>
-          <a href="/" className="text-blue-600 hover:text-blue-700 font-semibold text-sm">← Back to Dashboard</a>
+          <p className="text-sm text-gray-500 mb-4">{configurationError}</p>
+          <Link href="/" className="text-blue-600 hover:text-blue-700 font-semibold text-sm">← Back to Dashboard</Link>
         </div>
       </div>
     );
@@ -33,33 +44,37 @@ export default function LoginPage() {
     setError('');
     setMessage('');
 
-    if (isSignUp) {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (signUpError) {
-        setError(signUpError.message);
+    try {
+      if (isSignUp) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        if (signUpError) {
+          setError(describeAuthError(signUpError).message);
+        } else {
+          setMessage('Check your email for a confirmation link!');
+        }
       } else {
-        setMessage('Check your email for a confirmation link!');
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) {
+          setError(describeAuthError(signInError).message);
+        } else {
+          router.push('/');
+          router.refresh();
+        }
       }
-    } else {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) {
-        setError(signInError.message);
-      } else {
-        router.push('/');
-        router.refresh();
-      }
+    } catch (authError) {
+      setError(describeAuthError(authError).message);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   return (

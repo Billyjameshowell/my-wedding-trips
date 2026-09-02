@@ -3,6 +3,11 @@
 import { createClient } from './supabase';
 import { Wedding, TrackerStatus, CARD_COLORS, AddWeddingInput } from './types';
 
+type WeddingRow = Record<string, unknown> & { id: string };
+type WeddingColorRow = { color: string };
+type FlightRow = Record<string, unknown> & { id: string; wedding_id: string };
+type PriceHistoryRow = Record<string, unknown> & { flight_id: string };
+
 function getSupabase() {
   const client = createClient();
   if (!client) throw new Error('Supabase not configured');
@@ -60,7 +65,7 @@ export async function fetchWeddings(): Promise<Wedding[]> {
   }
 
   // Fetch flights for all weddings
-  const weddingIds = weddings.map((w) => w.id);
+  const weddingIds = weddings.map((w: WeddingRow) => w.id);
   const { data: flights, error: flightsError } = await supabase
     .from('flights')
     .select('*')
@@ -71,7 +76,7 @@ export async function fetchWeddings(): Promise<Wedding[]> {
   }
 
   // Fetch price history for all flights
-  const flightIds = (flights || []).map(f => f.id);
+  const flightIds = (flights || []).map((f: FlightRow) => f.id);
   const { data: priceHistories } = flightIds.length > 0
     ? await supabase
         .from('price_history')
@@ -80,10 +85,10 @@ export async function fetchWeddings(): Promise<Wedding[]> {
         .order('recorded_at', { ascending: true })
     : { data: [] };
 
-  return weddings.map(w => {
-    const flight = flights?.find(f => f.wedding_id === w.id) || null;
+  return weddings.map((w: WeddingRow) => {
+    const flight = flights?.find((f: FlightRow) => f.wedding_id === w.id) || null;
     const history = flight
-      ? (priceHistories || []).filter(ph => ph.flight_id === flight.id)
+      ? (priceHistories || []).filter((ph: PriceHistoryRow) => ph.flight_id === flight.id)
       : [];
     return toWedding(w, flight, history);
   });
@@ -102,7 +107,7 @@ export async function createWedding(data: AddWeddingInput): Promise<Wedding | nu
     .from('weddings')
     .select('color')
     .eq('user_id', user.id);
-  const usedColors = (existing || []).map(w => w.color);
+  const usedColors = (existing || []).map((w: WeddingColorRow) => w.color);
   const color = CARD_COLORS.find(c => !usedColors.includes(c)) || CARD_COLORS[0];
 
   const { data: wedding, error } = await supabase

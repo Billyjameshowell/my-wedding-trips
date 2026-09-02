@@ -5,7 +5,7 @@ import { Wedding, TrackerStatus, AddWeddingInput } from './types';
 import { createClient, isSupabaseConfigured } from './supabase';
 import * as localStorage from './storage';
 import * as database from './database';
-import type { User } from '@supabase/supabase-js';
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 
 export function useWeddings() {
   const [weddings, setWeddings] = useState<Wedding[]>([]);
@@ -44,10 +44,12 @@ export function useWeddings() {
           setIsOnline(true);
         }
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-          setUser(session?.user ?? null);
-          setIsOnline(!!session?.user);
-        });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (_event: AuthChangeEvent, session: Session | null) => {
+            setUser(session?.user ?? null);
+            setIsOnline(!!session?.user);
+          }
+        );
 
         setLoading(false);
         return () => subscription.unsubscribe();
