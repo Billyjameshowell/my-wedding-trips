@@ -408,6 +408,9 @@ function NoteField({
         defaultValue={value}
         placeholder={placeholder}
         rows={2}
+        onValueChange={(next, details) => {
+          if (details.source === 'agent' && next !== value) onCommit(next);
+        }}
         onBlur={(event) => {
           const next = event.currentTarget.value;
           if (next !== value) onCommit(next);

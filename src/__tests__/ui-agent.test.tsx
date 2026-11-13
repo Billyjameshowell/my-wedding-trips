@@ -5,10 +5,12 @@ import { createAgent } from '@ui-sdk/react/agent';
 import { vi } from 'vitest';
 import Dashboard from '@/app/page';
 import LoginPage from '@/app/login/page';
+import WeddingDetailPage from '@/app/wedding/[id]/page';
 
-const { addWedding, updateStatus, removeWedding } = vi.hoisted(() => ({
+const { addWedding, updateStatus, updateDetails, removeWedding } = vi.hoisted(() => ({
   addWedding: vi.fn(async () => true),
   updateStatus: vi.fn(),
+  updateDetails: vi.fn(),
   removeWedding: vi.fn(),
 }));
 
@@ -50,7 +52,7 @@ vi.mock('@/lib/useWeddings', () => ({
     error: null,
     addWedding,
     updateStatus,
-    updateDetails: vi.fn(),
+    updateDetails,
     removeWedding,
     savePriceCheck: vi.fn(),
     signOut: vi.fn(),
@@ -142,6 +144,18 @@ test('removing a wedding waits for a person', async () => {
   });
   expect(allowed.ok, allowed.error?.message).toBe(true);
   expect(removeWedding).toHaveBeenCalledWith('w1');
+});
+
+test('an agent edit of notes is saved', async () => {
+  updateDetails.mockClear();
+  render(<WeddingDetailPage />);
+
+  const result = await agent.act({
+    steps: [{ ref: 'Notes', action: 'setValue', args: ['Bring a jacket'] }],
+  });
+
+  expect(result.ok, result.error?.message).toBe(true);
+  expect(updateDetails).toHaveBeenCalledWith('w1', { notes: 'Bring a jacket' });
 });
 
 test('an agent can fill the sign-in form', async () => {
