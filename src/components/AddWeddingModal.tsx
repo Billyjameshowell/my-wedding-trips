@@ -1,291 +1,284 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+  type DialogController,
+} from '@ui-sdk/react/dialog';
+import { Button } from '@ui-sdk/react/button';
+import { Field, FieldError, FieldLabel } from '@ui-sdk/react/field';
+import { Input } from '@ui-sdk/react/input';
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from '@ui-sdk/react/collapsible';
 import { AddWeddingInput } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import DateField from './DateField';
 
 interface AddWeddingModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAdd: (data: AddWeddingInput) => void | Promise<void>;
+  controller: DialogController;
+  onAdd: (data: AddWeddingInput) => Promise<boolean>;
 }
 
-export default function AddWeddingModal({ isOpen, onClose, onAdd }: AddWeddingModalProps) {
+const primaryButton =
+  'rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50';
+const secondaryButton =
+  'rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50';
+
+export function AddWeddingTrigger({
+  controller,
+  className,
+  children,
+}: {
+  controller: DialogController;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <DialogTrigger controller={controller} className={className}>
+      {children}
+    </DialogTrigger>
+  );
+}
+
+export default function AddWeddingModal({ controller, onAdd }: AddWeddingModalProps) {
   const [coupleName, setCoupleName] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState<string | null>(null);
   const [location, setLocation] = useState('');
   const [venue, setVenue] = useState('');
   const [showFlight, setShowFlight] = useState(false);
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
-  const [departureDate, setDepartureDate] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-
+  const [departureDate, setDepartureDate] = useState<string | null>(null);
+  const [returnDate, setReturnDate] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  function getFlightValidationError() {
-    if (!showFlight) return null;
+  function reset() {
+    setCoupleName('');
+    setDate(null);
+    setLocation('');
+    setVenue('');
+    setShowFlight(false);
+    setOrigin('');
+    setDestination('');
+    setDepartureDate(null);
+    setReturnDate(null);
+    setFormError(null);
+  }
 
+  function flightError() {
+    if (!showFlight) return null;
     const trimmedOrigin = origin.trim().toUpperCase();
     const trimmedDestination = destination.trim().toUpperCase();
-
     if (!trimmedOrigin || !trimmedDestination || !departureDate || !returnDate) {
-      return 'Please complete all flight fields or remove flight details.';
+      return 'Complete every flight field, or close flight details.';
     }
-
     const airportCode = /^[A-Z]{3}$/;
     if (!airportCode.test(trimmedOrigin) || !airportCode.test(trimmedDestination)) {
-      return 'Airport codes must be exactly 3 letters (for example: LAX).';
+      return 'Airport codes are 3 letters, like LAX.';
     }
-
     if (returnDate < departureDate) {
-      return 'Return date must be on or after departure date.';
+      return 'The return date has to be on or after departure.';
     }
-
     return null;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!coupleName || !date || !location || submitting) return;
-
-    const validationError = getFlightValidationError();
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) return;
+    const validationError = flightError();
     if (validationError) {
       setFormError(validationError);
       return;
     }
+    if (!date) return;
+    const flight = showFlight
+      ? {
+          origin: origin.trim().toUpperCase(),
+          destination: destination.trim().toUpperCase(),
+          departureDate,
+          returnDate,
+        }
+      : undefined;
+    if (flight && (!flight.departureDate || !flight.returnDate)) return;
 
     setFormError(null);
-    const trimmedOrigin = origin.trim().toUpperCase();
-    const trimmedDestination = destination.trim().toUpperCase();
-
     setSubmitting(true);
     try {
-      await onAdd({
+      const added = await onAdd({
         coupleName: coupleName.trim(),
         date,
         location: location.trim(),
         venue: venue.trim() || undefined,
-        flight: showFlight
-          ? { origin: trimmedOrigin, destination: trimmedDestination, departureDate, returnDate }
+        flight: flight && flight.departureDate && flight.returnDate
+          ? {
+              origin: flight.origin,
+              destination: flight.destination,
+              departureDate: flight.departureDate,
+              returnDate: flight.returnDate,
+            }
           : undefined,
       });
-
-      // Reset only after successful add
-      setCoupleName('');
-      setDate('');
-      setLocation('');
-      setVenue('');
-      setShowFlight(false);
-      setOrigin('');
-      setDestination('');
-      setDepartureDate('');
-      setReturnDate('');
+      if (added) {
+        reset();
+        controller.close();
+      }
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className={cn(
-        'relative w-full max-w-lg bg-white rounded-2xl shadow-2xl',
-        'animate-in fade-in slide-in-from-bottom-4 duration-300'
-      )}>
-        <div className="p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">Add a Wedding</h2>
-          <p className="text-sm text-gray-500 mb-6">Another one! Let&apos;s get organized.</p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Couple name */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Who&apos;s getting married?
-              </label>
-              <input
-                type="text"
-                value={coupleName}
-                onChange={(e) => setCoupleName(e.target.value)}
-                placeholder="Sarah & Mike"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                  transition-all placeholder:text-gray-300"
-                required
-                autoFocus
-              />
-            </div>
-
-            {/* Date & Location row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Wedding Date
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                    transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Austin, TX"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                    transition-all placeholder:text-gray-300"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Venue */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Venue <span className="font-normal text-gray-400">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={venue}
-                onChange={(e) => setVenue(e.target.value)}
-                placeholder="The Grand Ballroom"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                  transition-all placeholder:text-gray-300"
-              />
-            </div>
-
-            {/* Flight toggle */}
-            <div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFlight(!showFlight);
-                  setFormError(null);
-                }}
-                className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                <span className={cn('transition-transform', showFlight && 'rotate-90')}>▸</span>
-                ✈ Add flight details
-              </button>
-
-              {showFlight && (
-                <div className="mt-3 space-y-3 pl-5 border-l-2 border-blue-100">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">From (Airport)</label>
-                      <input
-                        type="text"
-                        value={origin}
-                        onChange={(e) => {
-                          setOrigin(e.target.value.trim().toUpperCase());
-                          setFormError(null);
-                        }}
-                        placeholder="LAX"
-                        maxLength={3}
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm uppercase
-                          focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                          transition-all placeholder:text-gray-300 placeholder:normal-case"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">To (Airport)</label>
-                      <input
-                        type="text"
-                        value={destination}
-                        onChange={(e) => {
-                          setDestination(e.target.value.trim().toUpperCase());
-                          setFormError(null);
-                        }}
-                        placeholder="AUS"
-                        maxLength={3}
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm uppercase
-                          focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                          transition-all placeholder:text-gray-300 placeholder:normal-case"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Depart</label>
-                      <input
-                        type="date"
-                        value={departureDate}
-                        onChange={(e) => {
-                          setDepartureDate(e.target.value);
-                          setFormError(null);
-                        }}
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
-                          focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Return</label>
-                      <input
-                        type="date"
-                        value={returnDate}
-                        onChange={(e) => {
-                          setReturnDate(e.target.value);
-                          setFormError(null);
-                        }}
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
-                          focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-
-            {formError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                {formError}
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold
-                  text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex-1 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold
-                  text-white hover:bg-gray-800 active:scale-[0.98] transition-all
-                  disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? 'Adding...' : 'Add Wedding 🎉'}
-              </button>
-            </div>
-          </form>
+    <Dialog controller={controller}>
+      <DialogBackdrop />
+      <DialogContent keepMounted>
+        <div>
+          <DialogTitle>Add a wedding</DialogTitle>
+          <DialogDescription>Another one. Let&apos;s get organized.</DialogDescription>
         </div>
-      </div>
-    </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <Field name="couple-name">
+            <FieldLabel>Who&apos;s getting married?</FieldLabel>
+            <Input
+              value={coupleName}
+              onValueChange={setCoupleName}
+              placeholder="Sarah & Mike"
+              autoComplete="off"
+              required
+              autoFocus
+            />
+            <FieldError match="valueMissing">Enter the couple&apos;s names.</FieldError>
+          </Field>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <DateField
+              label="Wedding date"
+              name="wedding-date"
+              value={date}
+              onValueChange={setDate}
+              required
+              calendarLabel="Show ceremony days"
+              monthNoun="ceremony"
+            />
+            <Field name="location">
+              <FieldLabel>Location</FieldLabel>
+              <Input
+                value={location}
+                onValueChange={setLocation}
+                placeholder="Austin, TX"
+                autoComplete="off"
+                required
+              />
+              <FieldError match="valueMissing">Enter a city.</FieldError>
+            </Field>
+          </div>
+
+          <Field name="venue">
+            <FieldLabel>Venue</FieldLabel>
+            <Input
+              value={venue}
+              onValueChange={setVenue}
+              placeholder="The Grand Ballroom"
+              autoComplete="off"
+            />
+          </Field>
+
+          <Collapsible
+            open={showFlight}
+            onOpenChange={(open) => {
+              setShowFlight(open);
+              setFormError(null);
+            }}
+          >
+            <CollapsibleTrigger className="text-sm font-semibold text-blue-700 hover:text-blue-800">
+              <span className="flight-chevron" aria-hidden="true">▸ </span>
+              Add flight details
+            </CollapsibleTrigger>
+            <CollapsiblePanel className="mt-3 space-y-3 border-l-2 border-blue-100 pl-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Field name="origin" invalid={formError ? true : undefined}>
+                  <FieldLabel>From</FieldLabel>
+                  <Input
+                    value={origin}
+                    onValueChange={(value) => {
+                      setOrigin(value.toUpperCase().slice(0, 3));
+                      setFormError(null);
+                    }}
+                    placeholder="LAX"
+                    autoComplete="off"
+                    maxLength={3}
+                    required={showFlight}
+                    className="uppercase"
+                  />
+                </Field>
+                <Field name="destination" invalid={formError ? true : undefined}>
+                  <FieldLabel>To</FieldLabel>
+                  <Input
+                    value={destination}
+                    onValueChange={(value) => {
+                      setDestination(value.toUpperCase().slice(0, 3));
+                      setFormError(null);
+                    }}
+                    placeholder="AUS"
+                    autoComplete="off"
+                    maxLength={3}
+                    required={showFlight}
+                    className="uppercase"
+                  />
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <DateField
+                  label="Depart"
+                  name="departure"
+                  value={departureDate}
+                  onValueChange={(next) => {
+                    setDepartureDate(next);
+                    setFormError(null);
+                  }}
+                  required={showFlight}
+                  calendarLabel="Show outbound days"
+                  monthNoun="outbound"
+                />
+                <DateField
+                  label="Return"
+                  name="return"
+                  value={returnDate}
+                  onValueChange={(next) => {
+                    setReturnDate(next);
+                    setFormError(null);
+                  }}
+                  required={showFlight}
+                  min={departureDate ?? undefined}
+                  calendarLabel="Show inbound days"
+                  monthNoun="inbound"
+                />
+              </div>
+            </CollapsiblePanel>
+          </Collapsible>
+
+          {formError && (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+              {formError}
+            </p>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <DialogClose className={`flex-1 ${secondaryButton}`}>Cancel</DialogClose>
+            <Button type="submit" className={`flex-1 ${primaryButton}`} disabled={submitting}>
+              {submitting ? 'Saving…' : 'Save wedding'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

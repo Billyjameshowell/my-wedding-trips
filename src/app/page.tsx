@@ -1,13 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { Button } from '@ui-sdk/react/button';
+import { createDialogController } from '@ui-sdk/react/dialog';
 import { TrackerStatus } from '@/lib/types';
 import { useWeddings } from '@/lib/useWeddings';
 import WeddingCard from '@/components/WeddingCard';
-import AddWeddingModal from '@/components/AddWeddingModal';
+import AddWeddingModal, { AddWeddingTrigger } from '@/components/AddWeddingModal';
 import DashboardStats from '@/components/DashboardStats';
 import EmptyState from '@/components/EmptyState';
-import Link from 'next/link';
+
+const primaryButton =
+  'rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-gray-900/10 hover:bg-gray-800';
 
 export default function Dashboard() {
   const {
@@ -22,7 +27,7 @@ export default function Dashboard() {
     signOut,
     clearError,
   } = useWeddings();
-  const [showAdd, setShowAdd] = useState(false);
+  const [addDialog] = useState(() => createDialogController());
 
   function handleStatusChange(
     id: string,
@@ -32,94 +37,87 @@ export default function Dashboard() {
     updateStatus(id, field, status);
   }
 
-  function handleDelete(id: string) {
-    if (window.confirm('Remove this wedding? This cannot be undone.')) {
-      removeWedding(id);
-    }
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-300 text-lg">Loading...</div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-lg text-gray-500">Loading…</div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div>
-            <h1 className="text-xl font-black text-gray-900 tracking-tight">
+            <h1 className="text-xl font-black tracking-tight text-gray-900">
               MyWeddingTrips
             </h1>
-            <p className="text-xs text-gray-400 font-medium">Wedding season, handled.</p>
+            <p className="text-xs font-medium text-gray-500">Wedding season, handled.</p>
           </div>
           <div className="flex items-center gap-3">
             {weddings.length > 0 && (
-              <button
-                onClick={() => setShowAdd(true)}
-                className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white
-                  hover:bg-gray-800 active:scale-[0.98] transition-all shadow-lg shadow-gray-900/10"
-              >
-                + Add Wedding
-              </button>
+              <AddWeddingTrigger controller={addDialog} className={primaryButton}>
+                Add a wedding
+              </AddWeddingTrigger>
             )}
             {user ? (
-              <button
+              <Button
                 onClick={signOut}
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-sm font-semibold text-gray-600 hover:text-gray-800"
                 title={user.email}
               >
-                Sign Out
-              </button>
+                Sign out
+              </Button>
             ) : hasSupabase ? (
-              <Link
-                href="/login"
-                className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+              <Button
+                render={<Link href="/login" />}
+                className="text-sm font-semibold text-blue-700 hover:text-blue-800"
               >
-                Sign In
-              </Link>
+                Sign in
+              </Button>
             ) : null}
           </div>
         </div>
       </header>
 
-      {/* Error banner */}
       {error && (
-        <div className="max-w-5xl mx-auto px-4 pt-4">
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
+        <div className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
             <div>
-              <div className="text-sm font-semibold text-red-700">Something went wrong</div>
-              <div className="text-xs text-red-600 mt-0.5 break-all">{error}</div>
+              <div className="text-sm font-semibold text-red-800">Something went wrong</div>
+              <div className="mt-0.5 break-all text-sm text-red-800">{error}</div>
             </div>
-            <button
+            <Button
               onClick={clearError}
-              className="text-red-400 hover:text-red-600 text-sm flex-shrink-0"
+              aria-label="Dismiss error"
+              className="text-sm font-bold text-red-800"
             >
-              ✕
-            </button>
+              <span aria-hidden="true">✕</span>
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Main content */}
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="mx-auto max-w-5xl px-4 py-6">
         {weddings.length === 0 ? (
-          <EmptyState onAdd={() => setShowAdd(true)} />
+          <EmptyState
+            action={
+              <AddWeddingTrigger controller={addDialog} className={primaryButton}>
+                Add your first wedding
+              </AddWeddingTrigger>
+            }
+          />
         ) : (
           <>
             <DashboardStats weddings={weddings} />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {weddings.map((wedding) => (
                 <WeddingCard
                   key={wedding.id}
                   wedding={wedding}
                   onStatusChange={handleStatusChange}
-                  onDelete={handleDelete}
+                  onDelete={removeWedding}
                 />
               ))}
             </div>
@@ -127,17 +125,7 @@ export default function Dashboard() {
         )}
       </main>
 
-      {/* Add modal */}
-      <AddWeddingModal
-        isOpen={showAdd}
-        onClose={() => setShowAdd(false)}
-        onAdd={async (data) => {
-          const added = await addWedding(data);
-          if (added) {
-            setShowAdd(false);
-          }
-        }}
-      />
+      <AddWeddingModal controller={addDialog} onAdd={addWedding} />
     </div>
   );
 }
