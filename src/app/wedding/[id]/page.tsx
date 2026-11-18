@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { TrackerStatus } from '@/lib/types';
 import { useWeddings } from '@/lib/useWeddings';
-import { formatDate, daysUntil, getDaysLabel, getUrgencyClass, cn } from '@/lib/utils';
+import { formatDate, daysUntil } from '@/lib/utils';
 import StatusPill from '@/components/StatusPill';
+import Countdown from '@/components/Countdown';
 import PriceChart from '@/components/PriceChart';
 import Link from 'next/link';
 
@@ -146,10 +147,7 @@ export default function WeddingDetailPage() {
                     )}
                   </div>
                 </div>
-                <div className={cn('text-right flex-shrink-0 ml-4', getUrgencyClass(days))}>
-                  <div className="text-4xl font-black">{days === 0 ? '🎉' : Math.abs(days)}</div>
-                  <div className="text-xs font-semibold uppercase tracking-wider">{getDaysLabel(days)}</div>
-                </div>
+                <Countdown days={days} size="lg" />
               </div>
               <button
                 onClick={() => setEditing(true)}

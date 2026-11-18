@@ -1,8 +1,9 @@
 'use client';
 
 import { Wedding, TrackerStatus } from '@/lib/types';
-import { formatDate, daysUntil, getDaysLabel, getUrgencyClass, cn } from '@/lib/utils';
+import { formatDate, daysUntil, cn } from '@/lib/utils';
 import StatusPill from './StatusPill';
+import Countdown from './Countdown';
 import Link from 'next/link';
 
 interface WeddingCardProps {
@@ -24,8 +25,7 @@ export default function WeddingCard({ wedding, onStatusChange, onDelete }: Weddi
       className={cn(
         'group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100',
         'transition-all duration-300 hover:shadow-lg hover:ring-gray-200',
-        'hover:-translate-y-1',
-        isPast && 'opacity-60'
+        'hover:-translate-y-1'
       )}
     >
       {/* Color accent bar */}
@@ -48,15 +48,7 @@ export default function WeddingCard({ wedding, onStatusChange, onDelete }: Weddi
             </div>
           </div>
 
-          {/* Days countdown */}
-          <div className={cn('text-right flex-shrink-0 ml-3', getUrgencyClass(days))}>
-            <div className="text-2xl font-black leading-none">
-              {days === 0 ? '🎉' : Math.abs(days)}
-            </div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider mt-0.5">
-              {getDaysLabel(days)}
-            </div>
-          </div>
+          <Countdown days={days} />
         </div>
 
         {/* Date & venue */}
