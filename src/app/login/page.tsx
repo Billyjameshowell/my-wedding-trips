@@ -1,20 +1,37 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@ui-sdk/react/button';
+import { Field, FieldError, FieldLabel } from '@ui-sdk/react/field';
+import { Input } from '@ui-sdk/react/input';
+import {
+  PasswordInput,
+  PasswordInputControl,
+  PasswordInputToggle,
+} from '@ui-sdk/react/password-input';
+import {
+  SegmentedControl,
+  SegmentedControlIndicator,
+  SegmentedControlItem,
+} from '@ui-sdk/react/segmented-control';
 import { describeAuthError, getAuthCallbackErrorMessage } from '@/lib/auth-errors';
 import { createClient, getSupabaseConfigurationError } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+
+const primaryButton =
+  'w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode, setMode] = useState<'sign-in' | 'create-account'>('sign-in');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const router = useRouter();
   const configurationError = getSupabaseConfigurationError();
+  const isSignUp = mode === 'create-account';
 
   useEffect(() => {
     const callbackError = getAuthCallbackErrorMessage(
@@ -25,12 +42,17 @@ export default function LoginPage() {
 
   if (configurationError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
         <div className="text-center">
-          <div className="text-4xl mb-3">🔧</div>
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Auth Not Configured</h2>
-          <p className="text-sm text-gray-500 mb-4">{configurationError}</p>
-          <Link href="/" className="text-blue-600 hover:text-blue-700 font-semibold text-sm">← Back to Dashboard</Link>
+          <div className="mb-3 text-4xl" aria-hidden="true">🔧</div>
+          <h2 className="mb-2 text-lg font-bold text-gray-900">Auth not configured</h2>
+          <p className="mb-4 text-sm text-gray-600">{configurationError}</p>
+          <Button
+            render={<Link href="/" />}
+            className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+          >
+            Back to dashboard
+          </Button>
         </div>
       </div>
     );
@@ -38,8 +60,8 @@ export default function LoginPage() {
 
   const supabase = createClient()!;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
@@ -56,7 +78,7 @@ export default function LoginPage() {
         if (signUpError) {
           setError(describeAuthError(signUpError).message);
         } else {
-          setMessage('Check your email for a confirmation link!');
+          setMessage('Check your email for a confirmation link.');
         }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -78,91 +100,90 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="text-4xl mb-3">💒</div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">MyWeddingTrips</h1>
-          <p className="text-sm text-gray-400 mt-1">Wedding season, handled.</p>
+        <div className="mb-8 text-center">
+          <div className="mb-3 text-4xl" aria-hidden="true">💒</div>
+          <h1 className="text-2xl font-black tracking-tight text-gray-900">MyWeddingTrips</h1>
+          <p className="mt-1 text-sm text-gray-500">Wedding season, handled.</p>
         </div>
 
-        {/* Form card */}
-        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">
+        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <SegmentedControl
+            aria-label="Account mode"
+            value={mode}
+            onValueChange={(value) => {
+              if (value === 'sign-in' || value === 'create-account') {
+                setMode(value);
+                setError('');
+                setMessage('');
+              }
+            }}
+            className="mb-6"
+          >
+            <SegmentedControlIndicator />
+            <SegmentedControlItem value="sign-in">Sign in</SegmentedControlItem>
+            <SegmentedControlItem value="create-account">Create account</SegmentedControlItem>
+          </SegmentedControl>
+
+          <h2 className="mb-1 text-lg font-bold text-gray-900">
             {isSignUp ? 'Create your account' : 'Welcome back'}
           </h2>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="mb-6 text-sm text-gray-600">
             {isSignUp ? 'Start tracking your wedding trips.' : 'Sign in to your dashboard.'}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
-              <input
+            <Field name="email" invalid={error ? true : undefined}>
+              <FieldLabel>Email</FieldLabel>
+              <Input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onValueChange={setEmail}
                 placeholder="you@example.com"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                  transition-all placeholder:text-gray-300"
+                autoComplete="email"
                 required
               />
-            </div>
+              <FieldError match="valueMissing">Enter your email.</FieldError>
+              <FieldError match="typeMismatch">Enter an email like you@example.com.</FieldError>
+            </Field>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
+            <Field name="password" invalid={error ? true : undefined}>
+              <FieldLabel>Password</FieldLabel>
+              <PasswordInput
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
-                minLength={6}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                  transition-all placeholder:text-gray-300"
+                onValueChange={setPassword}
                 required
-              />
-            </div>
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              >
+                <PasswordInputControl placeholder="At least 6 characters" minLength={6} />
+                <PasswordInputToggle aria-label="Show password">
+                  {(state) => (state.visible ? 'Hide' : 'Show')}
+                </PasswordInputToggle>
+              </PasswordInput>
+              <FieldError match="valueMissing">Enter a password.</FieldError>
+              <FieldError match="tooShort">Use at least 6 characters.</FieldError>
+            </Field>
 
             {error && (
-              <div className="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-2.5 font-medium">
+              <div className="rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-800">
                 {error}
               </div>
             )}
 
             {message && (
-              <div className="bg-emerald-50 text-emerald-600 text-sm rounded-xl px-4 py-2.5 font-medium">
+              <div className="rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800" role="status">
                 {message}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white
-                hover:bg-gray-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Hold on...' : isSignUp ? 'Create Account' : 'Sign In'}
-            </button>
+            <Button type="submit" disabled={loading} className={primaryButton}>
+              {loading ? 'Hold on…' : 'Continue'}
+            </Button>
           </form>
-
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError('');
-                setMessage('');
-              }}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-            </button>
-          </div>
         </div>
 
-        <p className="text-center text-xs text-gray-300 mt-6">
+        <p className="mt-6 text-center text-xs text-gray-500">
           $11/month after free trial
         </p>
       </div>
