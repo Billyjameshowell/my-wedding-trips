@@ -19,9 +19,10 @@ import { Textarea } from '@ui-sdk/react/textarea';
 import { Toast, ToastDescription, ToastRegion, ToastTitle, createToaster } from '@ui-sdk/react/toast';
 import { TrackerStatus } from '@/lib/types';
 import { useWeddings } from '@/lib/useWeddings';
-import { formatDate, daysUntil, getDaysLabel, getUrgencyClass, cn } from '@/lib/utils';
+import { formatDate, daysUntil } from '@/lib/utils';
 import StatusSelect from '@/components/StatusSelect';
 import DateField from '@/components/DateField';
+import Countdown from '@/components/Countdown';
 import PriceChart from '@/components/PriceChart';
 
 const primaryButton =
@@ -158,10 +159,7 @@ export default function WeddingDetailPage() {
                 )}
               </div>
             </div>
-            <div className={cn('ml-4 shrink-0 text-right', getUrgencyClass(days))}>
-              <div className="text-4xl font-black">{days === 0 ? '🎉' : Math.abs(days)}</div>
-              <div className="text-xs font-semibold uppercase tracking-wider">{getDaysLabel(days)}</div>
-            </div>
+            <Countdown days={days} size="lg" />
           </div>
 
           <Dialog open={editing} onOpenChange={handleEditOpen}>

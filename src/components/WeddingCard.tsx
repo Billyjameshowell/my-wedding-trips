@@ -14,8 +14,9 @@ import {
   createAlertDialogController,
 } from '@ui-sdk/react/alert-dialog';
 import { Wedding, TrackerStatus } from '@/lib/types';
-import { formatDate, daysUntil, getDaysLabel, getUrgencyClass, cn } from '@/lib/utils';
+import { formatDate, daysUntil, cn } from '@/lib/utils';
 import StatusSelect from './StatusSelect';
+import Countdown from './Countdown';
 
 interface WeddingCardProps {
   wedding: Wedding;
@@ -41,7 +42,7 @@ export default function WeddingCard({ wedding, onStatusChange, onDelete }: Weddi
       className={cn(
         'relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100',
         'transition-all duration-300 hover:shadow-lg hover:ring-gray-200',
-        isPast && 'opacity-75'
+        'hover:-translate-y-1'
       )}
     >
       <div className="h-1.5" style={{ backgroundColor: wedding.color }} />
@@ -65,14 +66,7 @@ export default function WeddingCard({ wedding, onStatusChange, onDelete }: Weddi
           </div>
 
           <div className="flex items-start gap-1">
-            <div className={cn('text-right', getUrgencyClass(days))}>
-              <div className="text-2xl font-black leading-none">
-                {days === 0 ? '🎉' : Math.abs(days)}
-              </div>
-              <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider">
-                {getDaysLabel(days)}
-              </div>
-            </div>
+            <Countdown days={days} />
             <Menu>
               <MenuTrigger
                 aria-label={`Actions for ${wedding.coupleName}`}

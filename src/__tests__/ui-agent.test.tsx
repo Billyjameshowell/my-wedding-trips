@@ -2,7 +2,7 @@
 import './ui-setup';
 import { render, screen } from '@testing-library/react';
 import { createAgent } from '@ui-sdk/react/agent';
-import { vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import Dashboard from '@/app/page';
 import LoginPage from '@/app/login/page';
 import WeddingDetailPage from '@/app/wedding/[id]/page';
@@ -181,4 +181,23 @@ test('an agent can fill the sign-in form', async () => {
   expect(result.ok, result.error?.message).toBe(true);
   expect(screen.getByLabelText<HTMLInputElement>('Email').value).toBe('ada@example.com');
   expect(screen.getByRole('heading', { name: 'Create your account' })).toBeTruthy();
+});
+
+test.each([
+  ['dashboard', Dashboard],
+  ['wedding detail', WeddingDetailPage],
+])('the %s keeps the countdown number and caption in days', (_, Page) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-28T12:00:00'));
+
+  try {
+    render(<Page />);
+
+    const phrase = screen.getByText('45 days away');
+    const countdown = phrase.parentElement!;
+    expect(countdown.querySelectorAll('[aria-hidden="true"]')[0].textContent).toBe('45');
+    expect(countdown.querySelectorAll('[aria-hidden="true"]')[1].textContent).toBe('days');
+  } finally {
+    vi.useRealTimers();
+  }
 });
